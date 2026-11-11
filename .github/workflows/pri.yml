@@ -1,0 +1,36 @@
+name: Icon index
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  pri:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v5
+      - name: Make resources.pri
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $kit = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\10.*\x64\makepri.exe" |
+            Sort-Object { [version]$_.Directory.Parent.Name } | Select-Object -Last 1
+          "makepri: $($kit.FullName)"
+          $layout = (Resolve-Path layout).Path
+          $config = Join-Path $env:RUNNER_TEMP 'priconfig.xml'
+          & $kit.FullName createconfig /cf $config /dq en-US /o
+          if ($LASTEXITCODE -ne 0) { throw 'makepri createconfig failed' }
+          & $kit.FullName new /pr $layout /cf $config /mn (Join-Path $layout 'AppxManifest.xml') /of (Join-Path $env:RUNNER_TEMP 'resources.pri') /o
+          if ($LASTEXITCODE -ne 0) { throw 'makepri new failed' }
+          New-Item -ItemType Directory out | Out-Null
+          Copy-Item (Join-Path $env:RUNNER_TEMP 'resources.pri') out/
+          & $kit.FullName dump /if out/resources.pri /of out/resources.pri.xml /o
+          Get-ChildItem out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: resources-pri
+          path: out/*
