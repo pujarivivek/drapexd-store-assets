@@ -24,6 +24,12 @@ jobs:
           $config = Join-Path $env:RUNNER_TEMP 'priconfig.xml'
           & $kit.FullName createconfig /cf $config /dq en-US /o
           if ($LASTEXITCODE -ne 0) { throw 'makepri createconfig failed' }
+          # By default the larger sizes are split into separate index files (for bundles). This is
+          # one package, so everything goes in one index.
+          [xml]$xml = Get-Content $config
+          $xml.SelectNodes('//packaging') | ForEach-Object { [void]$_.ParentNode.RemoveChild($_) }
+          $xml.Save($config)
+          Get-Content $config
           & $kit.FullName new /pr $layout /cf $config /mn (Join-Path $layout 'AppxManifest.xml') /of (Join-Path $env:RUNNER_TEMP 'resources.pri') /o
           if ($LASTEXITCODE -ne 0) { throw 'makepri new failed' }
           New-Item -ItemType Directory out | Out-Null
